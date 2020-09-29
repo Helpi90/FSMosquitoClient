@@ -40,6 +40,7 @@
 
             // Define configuration for the MQTT Broker connection
             MqttBrokerUrl = configuration["fs_mosquito_serverurl"];
+            var mqttProtocol = configuration["fs_mosquito_protocol"];
             var fsmUsername = _username = configuration["fs_mosquito_username"];
             var fsmPassword = configuration["fs_mosquito_authentication_token"];
 
@@ -54,25 +55,46 @@
             if (!uint.TryParse(configuration["fs_mosquito_delay_interval"], out uint delayInterval)) {
                 delayInterval = 15000;
             }
-
-            _mqttClientOptions = new MqttClientOptionsBuilder()
-               .WithClientId(_username)
-               .WithWebSocketServer(MqttBrokerUrl)
-               .WithCredentials(fsmUsername, fsmPassword)
-               .WithKeepAlivePeriod(TimeSpan.FromMilliseconds(keepAlivePeriod))
-               .WithCommunicationTimeout(TimeSpan.FromMilliseconds(communicationTimeout))
-               .WithWillDelayInterval(delayInterval)
-               .WithWillMessage(new MqttApplicationMessage()
-               {
-                   PayloadFormatIndicator = MQTTnet.Protocol.MqttPayloadFormatIndicator.CharacterData,
-                   ContentType = "text/plain",
-                   Topic = string.Format(FSMosquitoTopic.ClientStatus, _username),
-                   Payload = Encoding.UTF8.GetBytes("Disconnected"),
-                   Retain = true
-               })
-               .WithCleanSession()
-               .Build();
-
+            if (mqttProtocol == "wss") {
+                _mqttClientOptions = new MqttClientOptionsBuilder()
+                    .WithClientId(_username)
+                    .WithWebSocketServer(MqttBrokerUrl)
+                    .WithCredentials(fsmUsername, fsmPassword)
+                    .WithKeepAlivePeriod(TimeSpan.FromMilliseconds(keepAlivePeriod))
+                    .WithCommunicationTimeout(TimeSpan.FromMilliseconds(communicationTimeout))
+                    .WithWillDelayInterval(delayInterval)
+                    .WithWillMessage(new MqttApplicationMessage()
+                    {
+                        PayloadFormatIndicator = MQTTnet.Protocol.MqttPayloadFormatIndicator.CharacterData,
+                        ContentType = "text/plain",
+                        Topic = string.Format(FSMosquitoTopic.ClientStatus, _username),
+                        Payload = Encoding.UTF8.GetBytes("Disconnected"),
+                        Retain = true
+                    })
+                    .WithCleanSession()
+                    .Build();
+            } else if (mqttProtocol == "tcp")
+            {
+                _mqttClientOptions = new MqttClientOptionsBuilder()
+                    .WithClientId(_username)
+                    .WithTcpServer(MqttBrokerUrl, 1883)
+                    .WithKeepAlivePeriod(TimeSpan.FromMilliseconds(keepAlivePeriod))
+                    .WithCommunicationTimeout(TimeSpan.FromMilliseconds(communicationTimeout))
+                    .WithWillDelayInterval(delayInterval)
+                    .WithWillMessage(new MqttApplicationMessage()
+                    {
+                        PayloadFormatIndicator = MQTTnet.Protocol.MqttPayloadFormatIndicator.CharacterData,
+                        ContentType = "text/plain",
+                        Topic = string.Format(FSMosquitoTopic.ClientStatus, _username),
+                        Payload = Encoding.UTF8.GetBytes("Disconnected"),
+                        Retain = true
+                    })
+                    .WithCleanSession()
+                    .Build();
+            } else
+            {
+                throw new ArgumentNullException(nameof(configuration));
+            }
             // Create a new MQTT client.
             var factory = new MqttFactory();
             var mqttClient = factory.CreateMqttClient();
